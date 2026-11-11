@@ -1,0 +1,20 @@
+[project]
+name = "argus-tactical-dashboard"
+version = "2.4.0"
+description = "ARGUS Sentinel Next-Gen Tactical Command Center Dashboard"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.28.0",
+    "python-dotenv>=1.0.0"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0"
+]
