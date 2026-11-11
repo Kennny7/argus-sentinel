@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#05080e" />
+      <stop offset="50%" stop-color="#0b1320" />
+      <stop offset="100%" stop-color="#070a0f" />
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00ff9d" />
+      <stop offset="50%" stop-color="#00e5ff" />
+      <stop offset="100%" stop-color="#70a6ff" />
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#00e5ff" stroke-width="0.5" stroke-opacity="0.12"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="300" fill="url(#bgGrad)"/>
+  <rect width="1200" height="300" fill="url(#grid)"/>
+
+  <!-- Tactical Scanning Arc -->
+  <circle cx="160" cy="150" r="110" fill="none" stroke="#00e5ff" stroke-width="1.5" stroke-opacity="0.25" stroke-dasharray="4,4"/>
+  <circle cx="160" cy="150" r="85" fill="none" stroke="#00ff9d" stroke-width="2" stroke-opacity="0.6"/>
+  <circle cx="160" cy="150" r="50" fill="#0c1726" stroke="#00e5ff" stroke-width="2.5"/>
+  <circle cx="160" cy="150" r="16" fill="#00ff9d"/>
+
+  <!-- Reticle Brackets -->
+  <path d="M 95 105 L 95 90 L 110 90" fill="none" stroke="#00ff9d" stroke-width="3"/>
+  <path d="M 225 105 L 225 90 L 210 90" fill="none" stroke="#00ff9d" stroke-width="3"/>
+  <path d="M 95 195 L 95 210 L 110 210" fill="none" stroke="#00ff9d" stroke-width="3"/>
+  <path d="M 225 195 L 225 210 L 210 210" fill="none" stroke="#00ff9d" stroke-width="3"/>
+
+  <!-- Radar Ray -->
+  <line x1="160" y1="150" x2="250" y2="90" stroke="#00ff9d" stroke-width="2" stroke-opacity="0.9"/>
+
+  <!-- Brand Typography -->
+  <text x="320" y="115" font-family="'Segoe UI', 'Roboto', 'Arial', sans-serif" font-weight="900" font-size="58" letter-spacing="8" fill="url(#textGrad)">ARGUS SENTINEL</text>
+  <text x="325" y="160" font-family="'Courier New', monospace" font-weight="600" font-size="20" letter-spacing="4" fill="#00e5ff">AUTONOMOUS RECONNAISSANCE &amp; PREDICTIVE CRIME GRID</text>
+  <text x="325" y="200" font-family="'Segoe UI', 'Arial', sans-serif" font-weight="400" font-size="16" letter-spacing="2" fill="#88a0bf">100% Free &amp; Open-Source Microservices Architecture | Docker | uv | PyTorch | FastAPI</text>
+
+  <!-- Status HUD Badges -->
+  <rect x="325" y="225" width="130" height="28" rx="4" fill="#0f2233" stroke="#00ff9d" stroke-width="1"/>
+  <text x="340" y="244" font-family="'Courier New', monospace" font-size="12" font-weight="bold" fill="#00ff9d">[REC] ACTIVE</text>
+
+  <rect x="470" y="225" width="165" height="28" rx="4" fill="#0f2233" stroke="#00e5ff" stroke-width="1"/>
+  <text x="483" y="244" font-family="'Courier New', monospace" font-size="12" font-weight="bold" fill="#00e5ff">GRID: DEFCON 2</text>
+
+  <rect x="650" y="225" width="185" height="28" rx="4" fill="#0f2233" stroke="#70a6ff" stroke-width="1"/>
+  <text x="663" y="244" font-family="'Courier New', monospace" font-size="12" font-weight="bold" fill="#70a6ff">3D RECON: ONLINE</text>
+
+  <rect x="850" y="225" width="185" height="28" rx="4" fill="#0f2233" stroke="#00ff9d" stroke-width="1"/>
+  <text x="863" y="244" font-family="'Courier New', monospace" font-size="12" font-weight="bold" fill="#00ff9d">HITL: ENGAGED</text>
+
+  <!-- Border Frame -->
+  <rect x="1" y="1" width="1198" height="298" fill="none" stroke="#00e5ff" stroke-width="1.5" stroke-opacity="0.3"/>
+</svg>
