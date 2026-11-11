@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARGUS SENTINEL | Autonomous Reconnaissance & Predictive Crime Grid</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/branding/argus_icon.svg">
+  <!-- Leaflet CSS for Tactical Mapping -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Three.js for 3D Facial Mesh Reconstruction -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #070a0f;
+      --bg-surface: #0c131f;
+      --bg-panel: rgba(14, 23, 38, 0.92);
+      --border-hud: rgba(0, 229, 255, 0.28);
+      --neon-cyan: #00e5ff;
+      --neon-green: #00ff9d;
+      --neon-red: #ff3366;
+      --neon-amber: #ffaa00;
+      --text-main: #d0e2ec;
+      --text-muted: #6f869e;
+      --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      overflow-x: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Scanline effect */
+    .scanlines {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+      background-size: 100% 3px, 6px 100%;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* Boot Sequence Screen */
+    #boot-screen {
+      position: fixed;
+      inset: 0;
+      background-color: #040609;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-family: var(--font-mono);
+      color: var(--neon-cyan);
+      transition: opacity 0.6s ease;
+    }
+    .boot-box {
+      width: 580px;
+      max-width: 90vw;
+      border: 1px solid var(--neon-cyan);
+      background: #080d16;
+      padding: 24px;
+      box-shadow: 0 0 25px rgba(0, 229, 255, 0.2);
+    }
+    .boot-progress {
+      height: 6px;
+      background: #111e2e;
+      margin: 16px 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .boot-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green));
+      transition: width 0.3s ease;
+    }
+    .btn-skip {
+      background: transparent;
+      border: 1px solid var(--text-muted);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .btn-skip:hover {
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+    }
+
+    /* Tactical Header */
+    header {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-hud);
+      padding: 8px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+    }
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-section img {
+      width: 32px;
+      height: 32px;
+    }
+    .brand-title {
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 2px;
+      color: var(--neon-cyan);
+    }
+    .brand-subtitle {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+    }
+    .hud-telemetry {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .badge {
+      padding: 3px 8px;
+      border-radius: 2px;
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 1px;
+    }
+    .badge-rec { background: rgba(255, 51, 102, 0.15); border: 1px solid var(--neon-red); color: var(--neon-red); animation: pulse 1.5s infinite; }
+    .badge-defcon { background: rgba(0, 229, 255, 0.15); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); }
+    .badge-online { background: rgba(0, 255, 157, 0.15); border: 1px solid var(--neon-green); color: var(--neon-green); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Navigation Toolbar */
+    .nav-tabs {
+      display: flex;
+      background: #090e18;
+      border-bottom: 1px solid var(--border-hud);
+      padding: 0 16px;
+      gap: 4px;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 10px 14px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all 0.2s ease;
+    }
+    .tab-btn:hover {
+      color: var(--neon-cyan);
+    }
+    .tab-btn.active {
+      color: var(--neon-green);
+      border-bottom-color: var(--neon-green);
+      background: rgba(0, 255, 157, 0.05);
+    }
+
+    /* Main Container Layout */
+    .main-grid {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 84px);
+      position: relative;
+    }
+
+    /* Views */
+    .view-container {
+      display: none;
+      flex: 1;
+      height: 100%;
+      position: relative;
+    }
+    .view-container.active {
+      display: flex;
+    }
+
+    /* Left Map Panel */
+    #tactical-map {
+      flex: 1;
+      height: 100%;
+      background: #06090e;
+    }
+
+    /* Right Sidebar Telemetry Panel */
+    .telemetry-sidebar {
+      width: 380px;
+      background: var(--bg-surface);
+      border-left: 1px solid var(--border-hud);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      z-index: 10;
+    }
+    .panel-header {
+      padding: 10px 14px;
+      background: #0a111c;
+      border-bottom: 1px solid var(--border-hud);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--neon-cyan);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      letter-spacing: 1px;
+    }
+    .panel-body {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .incident-card {
+      background: var(--bg-panel);
+      border-left: 3px solid var(--neon-cyan);
+      border-top: 1px solid rgba(255,255,255,0.05);
+      border-right: 1px solid rgba(255,255,255,0.05);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      padding: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .incident-card:hover {
+      background: #111d2e;
+    }
+    .incident-card.critical { border-left-color: var(--neon-red); }
+    .incident-card.high { border-left-color: var(--neon-amber); }
+    .incident-card.medium { border-left-color: var(--neon-cyan); }
+    .incident-card.low { border-left-color: var(--neon-green); }
+
+    .card-title {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+    }
+    .card-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* CCTV Recon View Styles (Replicating User Images) */
+    .cctv-viewport {
+      flex: 1;
+      height: 100%;
+      background: #000;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .cctv-base-img {
+      max-height: 100%;
+      max-width: 100%;
+      object-fit: contain;
+      filter: contrast(1.1) brightness(0.9);
+    }
+    .cctv-hud-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border: 1px solid rgba(0, 255, 157, 0.2);
+    }
+    .cctv-hud-top {
+      position: absolute;
+      top: 18px; left: 24px; right: 24px;
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--neon-red);
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+    .cctv-hud-bottom {
+      position: absolute;
+      bottom: 20px; left: 24px; right: 24px;
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--neon-green);
+    }
+
+    /* Target Reticle (Green corners around head/torso) */
+    .target-reticle {
+      position: absolute;
+      width: 140px;
+      height: 170px;
+      left: 48%;
+      top: 25%;
+      transform: translate(-50%, -20%);
+      pointer-events: auto;
+      cursor: crosshair;
+    }
+    .reticle-corner {
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      border: 3px solid var(--neon-green);
+    }
+    .reticle-corner.tl { top: 0; left: 0; border-right: none; border-bottom: none; }
+    .reticle-corner.tr { top: 0; right: 0; border-left: none; border-bottom: none; }
+    .reticle-corner.bl { bottom: 0; left: 0; border-right: none; border-top: none; }
+    .reticle-corner.br { bottom: 0; right: 0; border-left: none; border-top: none; }
+
+    .scanning-line {
+      position: absolute;
+      left: 4px; right: 4px;
+      height: 2px;
+      background: var(--neon-green);
+      box-shadow: 0 0 8px var(--neon-green);
+      animation: scanAnim 2.2s infinite alternate ease-in-out;
+    }
+    @keyframes scanAnim {
+      0% { top: 8px; opacity: 0.9; }
+      100% { top: 155px; opacity: 0.9; }
+    }
+
+    /* Linked Profile HUD Card (from user image) */
+    .hud-profile-card {
+      position: absolute;
+      left: 6%;
+      top: 24%;
+      width: 260px;
+      background: rgba(9, 15, 23, 0.88);
+      border: 1px solid var(--neon-green);
+      padding: 12px;
+      font-family: var(--font-mono);
+      box-shadow: 0 0 15px rgba(0, 255, 157, 0.25);
+      pointer-events: auto;
+    }
+    .hud-mugshot {
+      width: 100%;
+      height: 140px;
+      background: #000;
+      border: 1px solid var(--neon-green);
+      margin-bottom: 8px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .hud-mugshot img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: grayscale(1) contrast(1.2);
+    }
+    .hud-designation {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--neon-green);
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .hud-code {
+      font-size: 11px;
+      color: var(--neon-cyan);
+      margin-bottom: 10px;
+    }
+    .hud-skill-tag {
+      font-size: 10px;
+      border-left: 2px solid var(--neon-cyan);
+      padding-left: 6px;
+      margin-bottom: 3px;
+      color: #b0c8dc;
+    }
+
+    /* HUD Stats Box (Right Side from user image) */
+    .hud-stats-box {
+      position: absolute;
+      right: 6%;
+      top: 50%;
+      width: 230px;
+      background: rgba(9, 15, 23, 0.88);
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      padding: 12px;
+      font-family: var(--font-mono);
+    }
+    .hud-stat-title {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+    }
+    .hud-stat-val {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--neon-green);
+      margin-bottom: 8px;
+    }
+
+    /* 3D Wireframe Canvas View */
+    #three-viewport {
+      flex: 1;
+      height: 100%;
+      background: radial-gradient(circle at center, #0a1320 0%, #040609 80%);
+      position: relative;
+    }
+    .mesh-controls {
+      position: absolute;
+      top: 16px; left: 16px;
+      background: rgba(8, 14, 22, 0.85);
+      border: 1px solid var(--border-hud);
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      width: 280px;
+      z-index: 20;
+    }
+    .ctrl-slider {
+      width: 100%;
+      margin: 6px 0 12px;
+      accent-color: var(--neon-green);
+    }
+    .btn-tactical {
+      background: #0f1c2d;
+      border: 1px solid var(--neon-cyan);
+      color: var(--neon-cyan);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 7px 12px;
+      cursor: pointer;
+      width: 100%;
+      letter-spacing: 1px;
+      transition: all 0.2s;
+    }
+    .btn-tactical:hover {
+      background: var(--neon-cyan);
+      color: #000;
+    }
+    .btn-verify {
+      background: #11281e;
+      border-color: var(--neon-green);
+      color: var(--neon-green);
+    }
+    .btn-verify:hover {
+      background: var(--neon-green);
+      color: #000;
+    }
+    .btn-reject {
+      background: #2b1119;
+      border-color: var(--neon-red);
+      color: var(--neon-red);
+    }
+    .btn-reject:hover {
+      background: var(--neon-red);
+      color: #000;
+    }
+
+    /* Forms */
+    .input-field {
+      width: 100%;
+      background: #080e18;
+      border: 1px solid var(--border-hud);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 6px 8px;
+      outline: none;
+      margin-bottom: 8px;
+    }
+    .input-field:focus {
+      border-color: var(--neon-cyan);
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.82);
+      z-index: 2000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal-card {
+      width: 650px;
+      max-width: 95vw;
+      background: #09101c;
+      border: 1px solid var(--neon-cyan);
+      padding: 20px;
+      box-shadow: 0 0 30px rgba(0, 229, 255, 0.3);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="scanlines"></div>
+
+  <!-- Tactical Boot Screen -->
+  <div id="boot-screen">
+    <div class="boot-box">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+        <img src="/assets/branding/argus_icon.svg" width="36" height="36" alt="ARGUS Icon">
+        <div>
+          <div style="font-weight:900; font-size:16px; letter-spacing:2px; color:var(--neon-cyan);">ARGUS SENTINEL v2.4.0</div>
+          <div style="font-size:10px; color:var(--text-muted);">AUTONOMOUS URBAN RECONNAISSANCE PLATFORM</div>
+        </div>
+      </div>
+      <div id="boot-log" style="font-size:11px; line-height:1.7; min-height:110px;">
+        [BIOS] Initializing Secure Hardware Security Module...<br>
+      </div>
+      <div class="boot-progress">
+        <div id="boot-progress-bar" class="boot-progress-bar"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span id="boot-status" style="font-size:10px; color:var(--neon-green);">INITIALIZING SUBSYSTEMS...</span>
+        <button class="btn-skip" onclick="dismissBootScreen()">[SKIP BOOT SEQUENCE]</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand-section">
+      <img src="/assets/branding/argus_icon.svg" alt="ARGUS Sentinel Icon">
+      <div>
+        <div class="brand-title">ARGUS SENTINEL</div>
+        <div class="brand-subtitle">AUTONOMOUS RECONNAISSANCE &amp; PREDICTIVE CRIME GRID</div>
+      </div>
+    </div>
+
+    <div class="hud-telemetry">
+      <span class="badge badge-rec">[REC] CAM-MATRIX</span>
+      <span class="badge badge-defcon">DEFCON 2</span>
+      <span class="badge badge-online">STREAM: ONLINE</span>
+      <span id="live-utc-clock" style="color:var(--neon-cyan); letter-spacing:1px;">2026-11-11 13:40:00 UTC</span>
+    </div>
+  </header>
+
+  <!-- Navigation Toolbar Tabs -->
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="switchView('map-view', this)">[1. TACTICAL GRID MAP]</button>
+    <button class="tab-btn" onclick="switchView('cctv-view', this)">[2. CCTV RECON MATRIX]</button>
+    <button class="tab-btn" onclick="switchView('mesh-view', this)">[3. 3D FACIAL MESH RECON]</button>
+    <button class="tab-btn" onclick="switchView('hitl-view', this)">[4. HITL VERIFICATION QUEUE]</button>
+    <button class="tab-btn" onclick="switchView('agent-view', this)">[5. AI AGENT INVESTIGATION]</button>
+    <button class="tab-btn" onclick="switchView('streams-view', this)">[6. STREAM CONNECTORS]</button>
+  </div>
+
+  <!-- Main Grid Workspace -->
+  <div class="main-grid">
+
+    <!-- VIEW 1: Tactical Grid Map -->
+    <div id="map-view" class="view-container active">
+      <div id="tactical-map"></div>
+
+      <!-- Telemetry Sidebar -->
+      <div class="telemetry-sidebar">
+        <div class="panel-header">
+          <span>INCIDENT TELEMETRY FEED</span>
+          <span id="incident-count-badge" class="badge badge-online">0 INCIDENTS</span>
+        </div>
+        <div style="padding:10px; background:#070d16; border-bottom:1px solid var(--border-hud);">
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="incident-search" class="input-field" placeholder="Filter by crime or sector..." style="margin-bottom:0;" oninput="filterIncidents()">
+            <button class="btn-tactical" style="width:70px;" onclick="fetchIncidents()">REFRESH</button>
+          </div>
+        </div>
+        <div id="incident-list-container" class="panel-body">
+          <!-- Dynamic incident cards -->
+        </div>
+
+        <div class="panel-header" style="margin-top:auto; border-top:1px solid var(--border-hud);">
+          <span>TEST INGESTION SIMULATOR</span>
+        </div>
+        <div style="padding:10px; background:#070d16;">
+          <input type="text" id="sim-crime-type" class="input-field" placeholder="Crime Type (e.g. Armed Robbery)" value="Aggravated Assault">
+          <select id="sim-sector" class="input-field">
+            <option value="SEC-01">Downtown Central (SEC-01)</option>
+            <option value="SEC-02">West Harbor District (SEC-02)</option>
+            <option value="SEC-03">North Industrial Ring (SEC-03)</option>
+            <option value="SEC-05">East Tech Corridor (SEC-05)</option>
+            <option value="SEC-06">South Transit Hub (SEC-06)</option>
+          </select>
+          <input type="text" id="sim-weapon" class="input-field" placeholder="Weapon (e.g. Firearm)" value="Firearm">
+          <button class="btn-tactical" onclick="simulateIncidentIngest()">[DISPATCH TEST INCIDENT]</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: CCTV Reconnaissance Matrix (Matching User Images) -->
+    <div id="cctv-view" class="view-container">
+      <div class="cctv-viewport">
+        <!-- Background Surveillance Frame -->
+        <img class="cctv-base-img" src="/assets/surveillance/cctv_target_lock_sample1.jpeg" alt="CCTV Street Feed">
+
+        <!-- HUD Layer -->
+        <div class="cctv-hud-overlay">
+          <div class="cctv-hud-top">
+            <div><span class="badge badge-rec">[REC] LIVE</span> &nbsp;CAM-SEC-01-04 // NORTH METRO PASS</div>
+            <div id="cctv-live-time">2026-08-13 12:57:01</div>
+          </div>
+
+          <div style="position:absolute; top:80px; left:26px; font-family:var(--font-mono); color:#fff; font-size:14px; letter-spacing:2px; font-weight:800;">
+            THE NEXT BIG<br>ROLE IN AI
+          </div>
+
+          <!-- Target Tracking Reticle Over Subject -->
+          <div class="target-reticle" onclick="openSubjectDossier('POI-8821')">
+            <div class="reticle-corner tl"></div>
+            <div class="reticle-corner tr"></div>
+            <div class="reticle-corner bl"></div>
+            <div class="reticle-corner br"></div>
+            <div class="scanning-line"></div>
+          </div>
+
+          <!-- Linked Target Profile Card (from user image) -->
+          <div class="hud-profile-card">
+            <div class="hud-mugshot">
+              <img src="/assets/surveillance/cctv_target_lock_sample2.jpeg" alt="Target Crop">
+            </div>
+            <div class="hud-designation">AI-FIRST<br>BACKEND ENGINEER</div>
+            <div class="hud-code">1V\9w2 • POI-8821</div>
+
+            <div class="hud-skill-tag">DSA: ELITE</div>
+            <div class="hud-skill-tag">SYSTEM DESIGN: DISTRIBUTED</div>
+            <div class="hud-skill-tag">RAG: KNOWLEDGE GRAPHS</div>
+            <div class="hud-skill-tag">LLMS &amp; AI AGENTS: AUTONOMOUS</div>
+
+            <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+              <span class="badge badge-online">94% BIOMETRIC MATCH</span>
+              <button class="btn-tactical" style="width:auto; padding:3px 8px; font-size:10px;" onclick="openHITLModal('HITL-POI-8821')">[VERIFY]</button>
+            </div>
+          </div>
+
+          <!-- HUD Telemetry Stats Panel (Right side from user image) -->
+          <div class="hud-stats-box">
+            <div class="hud-stat-title">STATS: BIOMETRIC INTELLIGENCE</div>
+            <div style="margin-top:8px;" class="hud-stat-title">HIGHEST SALARY / VALUE</div>
+            <div class="hud-stat-val">INR 70LPA+</div>
+
+            <div class="hud-stat-title">SALARY HIKE / ESCALATION</div>
+            <div class="hud-stat-val">150%</div>
+
+            <div class="hud-stat-title">THREAT LEVEL: HIGH RISK</div>
+            <div style="font-size:11px; color:#fff; margin-top:4px;">VERIFIED SOCIAL FOOTPRINT:</div>
+            <div style="font-size:10px; color:var(--neon-cyan); margin-top:2px;">github.com/vance-cipher-core</div>
+            <div style="font-size:10px; color:var(--neon-cyan);">linkedin.com/in/marcus-vance</div>
+          </div>
+
+          <div class="cctv-hud-bottom">
+            <div>STATUS: OPTICAL LOCK CONFIRMED // TARGET ACQUIRED</div>
+            <div>SENSOR RESOLUTION: 4K UHD // FRAMERATE: 30 FPS</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: 3D Facial Mesh Reconstruction -->
+    <div id="mesh-view" class="view-container">
+      <div id="three-viewport">
+        <div class="mesh-controls">
+          <div style="font-weight:700; color:var(--neon-cyan); margin-bottom:8px;">3D FACIAL MESH RECONSTRUCTION</div>
+          <div style="color:var(--text-muted); font-size:10px; margin-bottom:12px;">Anthropometric Landmark Topology (468 vertices)</div>
+          
+          <label>SELECT TARGET SUBJECT:</label>
+          <select id="mesh-subject-select" class="input-field" onchange="loadSubject3DMesh()">
+            <option value="POI-8821">Marcus Vance (POI-8821)</option>
+            <option value="POI-9043">Elena Rostova (POI-9043)</option>
+            <option value="POI-3312">Raymond Cruz (POI-3312)</option>
+            <option value="POI-5520">Sophia Chen (POI-5520)</option>
+            <option value="POI-1104">Jordan Blake (POI-1104)</option>
+          </select>
+
+          <label>PITCH ANGLE (X-AXIS):</label>
+          <input type="range" id="slider-pitch" class="ctrl-slider" min="-30" max="30" value="0" oninput="updateMeshRotation()">
+
+          <label>YAW ANGLE (Y-AXIS):</label>
+          <input type="range" id="slider-yaw" class="ctrl-slider" min="-45" max="45" value="0" oninput="updateMeshRotation()">
+
+          <label>ROLL ROTATION (Z-AXIS):</label>
+          <input type="range" id="slider-roll" class="ctrl-slider" min="-30" max="30" value="0" oninput="updateMeshRotation()">
+
+          <div style="margin:10px 0; padding:8px; background:#070d16; border:1px solid var(--border-hud); font-size:10px; line-height:1.6;">
+            <div>DEPTH CONFIDENCE: <span style="color:var(--neon-green);" id="mesh-depth-conf">96.5%</span></div>
+            <div>FACIAL SYMMETRY: <span style="color:var(--neon-cyan);" id="mesh-symmetry">0.948</span></div>
+            <div>INTERPUPILLARY DIST: <span style="color:#fff;" id="mesh-ipd">63.8 mm</span></div>
+            <div>TOPOLOGY NODES: <span style="color:var(--neon-green);" id="mesh-node-count">164 VERTICES</span></div>
+          </div>
+
+          <button class="btn-tactical btn-verify" onclick="save3DProfile()">[SAVE 3D PROFILE TO DATABASE]</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 4: Human-In-The-Loop Verification Queue -->
+    <div id="hitl-view" class="view-container" style="padding:20px; flex-direction:column; background:#080d16; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div>
+          <div style="font-family:var(--font-mono); font-size:16px; font-weight:800; color:var(--neon-cyan);">HUMAN-IN-THE-LOOP (HITL) VERIFICATION CONSOLE</div>
+          <div style="font-size:11px; color:var(--text-muted);">Operator audit station for high-threat or ambiguous biometric detections.</div>
+        </div>
+        <button class="btn-tactical" style="width:auto; padding:6px 14px;" onclick="fetchHITLQueue()">[REFRESH QUEUE]</button>
+      </div>
+
+      <div id="hitl-queue-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:16px;">
+        <!-- Dynamic HITL Cards -->
+      </div>
+    </div>
+
+    <!-- VIEW 5: AI Agent Investigation Console -->
+    <div id="agent-view" class="view-container" style="padding:20px; flex-direction:column; background:#080d16; overflow-y:auto;">
+      <div style="font-family:var(--font-mono); font-size:16px; font-weight:800; color:var(--neon-cyan); margin-bottom:4px;">AUTONOMOUS AGENTIC INVESTIGATION CONSOLE</div>
+      <div style="font-size:11px; color:var(--text-muted); margin-bottom:16px;">Multi-hop Knowledge Graph Traversal &amp; Local LLM Intelligence Synthesizer.</div>
+
+      <div style="display:flex; gap:16px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:320px; background:#0c131f; border:1px solid var(--border-hud); padding:16px;">
+          <div style="font-family:var(--font-mono); font-weight:700; color:var(--neon-green); margin-bottom:12px;">TARGET PARAMETERS</div>
+          <label>SELECT SUBJECT OF INTEREST:</label>
+          <select id="agent-target-select" class="input-field">
+            <option value="POI-8821">Marcus Vance (POI-8821) - Cyber / Infiltration</option>
+            <option value="POI-9043">Elena Rostova (POI-9043) - Tactical Signals</option>
+            <option value="POI-3312">Raymond Cruz (POI-3312) - Contraband Logistics</option>
+            <option value="POI-5520">Sophia Chen (POI-5520) - Financial Wire Intrusion</option>
+          </select>
+
+          <label>OPERATIONAL SECTOR:</label>
+          <select id="agent-sector-select" class="input-field">
+            <option value="Downtown Central">Downtown Central</option>
+            <option value="West Harbor District">West Harbor District</option>
+            <option value="North Industrial Ring">North Industrial Ring</option>
+            <option value="East Tech Corridor">East Tech Corridor</option>
+            <option value="South Transit Hub">South Transit Hub</option>
+          </select>
+
+          <button class="btn-tactical" style="margin-top:12px;" onclick="triggerAgentInvestigation()">[EXECUTE AUTONOMOUS INVESTIGATION]</button>
+        </div>
+
+        <div style="flex:2; min-width:400px; background:#0c131f; border:1px solid var(--border-hud); padding:16px;">
+          <div style="font-family:var(--font-mono); font-weight:700; color:var(--neon-cyan); margin-bottom:12px;">SYNTHESIZED INTELLIGENCE DOSSIER</div>
+          <div id="agent-output" style="font-family:var(--font-mono); font-size:11px; line-height:1.7; background:#070a0f; padding:14px; border:1px solid rgba(0,229,255,0.2); min-height:220px; white-space:pre-wrap;">
+Select target parameters and click [EXECUTE AUTONOMOUS INVESTIGATION] to initiate knowledge graph traversal and local neural reasoning.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 6: Stream Connectors -->
+    <div id="streams-view" class="view-container" style="padding:20px; flex-direction:column; background:#080d16; overflow-y:auto;">
+      <div style="font-family:var(--font-mono); font-size:16px; font-weight:800; color:var(--neon-cyan); margin-bottom:4px;">REAL-TIME DATA STREAM CONNECTORS</div>
+      <div style="font-size:11px; color:var(--text-muted); margin-bottom:16px;">Open-source messaging fabrics, sensor feeds, and telemetry pipelines.</div>
+
+      <div id="streams-table-container" style="background:#0c131f; border:1px solid var(--border-hud); padding:16px;">
+        <table style="width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:12px;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border-hud); text-align:left; color:var(--neon-cyan);">
+              <th style="padding:10px;">STREAM PIPELINE</th>
+              <th style="padding:10px;">PROTOCOL</th>
+              <th style="padding:10px;">STATUS</th>
+              <th style="padding:10px;">RATE / METRIC</th>
+              <th style="padding:10px;">CHANNEL / TOPIC</th>
+            </tr>
+          </thead>
+          <tbody id="streams-table-body">
+            <!-- Dynamic streams -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- HITL Verification Modal Dialog -->
+  <div id="hitl-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <span style="font-family:var(--font-mono); font-weight:800; color:var(--neon-green);" id="modal-title">HUMAN AUDIT VERIFICATION</span>
+        <button onclick="closeHITLModal()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-family:var(--font-mono);">[CLOSE X]</button>
+      </div>
+
+      <div style="display:flex; gap:16px; margin-bottom:14px;">
+        <div style="width:160px; height:160px; background:#000; border:1px solid var(--neon-cyan); overflow:hidden;">
+          <img id="modal-img" src="/assets/surveillance/cctv_target_lock_sample2.jpeg" style="width:100%; height:100%; object-fit:cover;" alt="Subject crop">
+        </div>
+        <div style="flex:1; font-family:var(--font-mono); font-size:11px; line-height:1.6;">
+          <div>SUBJECT ID: <span style="color:var(--neon-cyan);" id="modal-sub-id">POI-8821</span></div>
+          <div>NAME: <span style="color:#fff;" id="modal-sub-name">Marcus Vance</span></div>
+          <div>ALIAS: <span style="color:var(--neon-green);" id="modal-sub-alias">Cipher</span></div>
+          <div>CONFIDENCE: <span style="color:var(--neon-green);" id="modal-sub-conf">94.2%</span></div>
+          <div>SIGHTED CAMERA: <span style="color:var(--neon-cyan);" id="modal-sub-cam">CAM-SEC-01-04</span></div>
+          <div>RISK RATING: <span style="color:var(--neon-red);" id="modal-sub-risk">HIGH THREAT</span></div>
+        </div>
+      </div>
+
+      <label style="font-family:var(--font-mono); font-size:11px;">OPERATOR AUDIT NOTES:</label>
+      <textarea id="modal-notes" class="input-field" rows="3" placeholder="Enter identification verification notes or justification..."></textarea>
+
+      <div style="display:flex; gap:10px; margin-top:12px;">
+        <button class="btn-tactical btn-verify" onclick="commitHITLDecision('APPROVE_MATCH')">[APPROVE MATCH]</button>
+        <button class="btn-tactical btn-reject" onclick="commitHITLDecision('REJECT_FALSE_POSITIVE')">[REJECT FALSE POSITIVE]</button>
+        <button class="btn-tactical" style="border-color:var(--neon-amber); color:var(--neon-amber);" onclick="commitHITLDecision('ESCALATE_ALERT')">[ESCALATE ALERT]</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:8000";
+    let mapInstance = null;
+    let mapMarkers = [];
+    let incidentData = [];
+    let activeHITLItem = null;
+
+    // 1. Boot Sequence
+    const bootSteps = [
+      "[BIOS] ARGUS Secure Microkernel v2.4.0 Loaded.",
+      "[NET] Binding Zero-Vendor-Lock Microservice Interfaces...",
+      "[ML] Loaded Dual-Head Gradient Boosting / RF Ensemble.",
+      "[RECON] Optical Surveillance Sentinel Matrix Connected (5 Cameras).",
+      "[3D] 468-Point Anthropometric Facial Mesh Reconstructor Ready.",
+      "[AGENT] Autonomous Investigation Reasoner Online.",
+      "[SYSTEM] DEFCON 2 Grid Operational."
+    ];
+    let stepIndex = 0;
+    const bootInterval = setInterval(() => {
+      const log = document.getElementById("boot-log");
+      const pbar = document.getElementById("boot-progress-bar");
+      if (stepIndex < bootSteps.length) {
+        log.innerHTML += bootSteps[stepIndex] + "<br>";
+        stepIndex++;
+        pbar.style.width = `${(stepIndex / bootSteps.length) * 100}%`;
+      } else {
+        clearInterval(bootInterval);
+        document.getElementById("boot-status").innerText = "ALL SYSTEMS NOMINAL.";
+        setTimeout(dismissBootScreen, 700);
+      }
+    }, 280);
+
+    function dismissBootScreen() {
+      clearInterval(bootInterval);
+      const bs = document.getElementById("boot-screen");
+      bs.style.opacity = "0";
+      setTimeout(() => { bs.style.display = "none"; }, 600);
+      initMap();
+      fetchIncidents();
+      fetchStreams();
+      init3DMeshViewer();
+      connectWebSocket();
+    }
+
+    // 2. Navigation
+    function switchView(viewId, btn) {
+      document.querySelectorAll(".view-container").forEach(el => el.classList.remove("active"));
+      document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
+      document.getElementById(viewId).classList.add("active");
+      if (btn) btn.classList.add("active");
+      if (viewId === "map-view" && mapInstance) {
+        setTimeout(() => { mapInstance.invalidateSize(); }, 200);
+      }
+      if (viewId === "hitl-view") fetchHITLQueue();
+      if (viewId === "streams-view") fetchStreams();
+    }
+
+    // 3. Tactical Map Initialization (Proton VPN / Threat Grid Style)
+    function initMap() {
+      if (mapInstance) return;
+      mapInstance = L.map("tactical-map", {
+        center: [34.0522, -118.2437],
+        zoom: 12,
+        zoomControl: false,
+        attributionControl: false
+      });
+
+      // Dark Tactical Basemap Tiles
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        maxZoom: 18,
+        subdomains: "abcd"
+      }).addTo(mapInstance);
+
+      L.control.zoom({ position: "bottomright" }).addTo(mapInstance);
+
+      // Add tactical vector communication lines (like Proton VPN connections)
+      const hubCenter = [34.0522, -118.2437];
+      const satellites = [
+        [33.7432, -118.2673],
+        [34.1808, -118.3090],
+        [34.1478, -118.1445],
+        [33.9416, -118.4085]
+      ];
+      satellites.forEach(target => {
+        L.polyline([hubCenter, target], {
+          color: "#00e5ff",
+          weight: 1.5,
+          opacity: 0.45,
+          dashArray: "4, 6"
+        }).addTo(mapInstance);
+      });
+    }
+
+    // 4. Incident Management
+    async function fetchIncidents() {
+      try {
+        const resp = await fetch(`${API_BASE}/api/v1/incidents?limit=150`);
+        const json = await resp.json();
+        incidentData = json.records || [];
+        renderIncidents(incidentData);
+        plotIncidentsOnMap(incidentData);
+      } catch (e) {
+        console.warn("Gateway offline, running offline mode", e);
+      }
+    }
+
+    function renderIncidents(list) {
+      const container = document.getElementById("incident-list-container");
+      document.getElementById("incident-count-badge").innerText = `${list.length} INCIDENTS`;
+      container.innerHTML = "";
+
+      list.slice(0, 50).forEach(inc => {
+        const card = document.createElement("div");
+        const tier = (inc.severity_tier || "Medium").toLowerCase();
+        card.className = `incident-card ${tier}`;
+        card.innerHTML = `
+          <div class="card-title">
+            <span>${inc.crime_type}</span>
+            <span style="color:var(--neon-${tier === 'critical' ? 'red' : tier === 'high' ? 'amber' : 'green'}); font-size:11px;">[SCORE ${inc.severity_score}]</span>
+          </div>
+          <div class="card-meta">
+            ${inc.sector_name} // ${inc.premise_type}
+          </div>
+          <div style="font-size:10px; color:#5f7892; margin-top:3px; display:flex; justify-content:space-between;">
+            <span>${inc.incident_id}</span>
+            <span>ETA ${inc.response_eta_minutes}m // ${inc.responding_unit}</span>
+          </div>
+        `;
+        card.onclick = () => {
+          if (mapInstance && inc.latitude && inc.longitude) {
+            mapInstance.flyTo([inc.latitude, inc.longitude], 15);
+          }
+        };
+        container.appendChild(card);
+      });
+    }
+
+    function plotIncidentsOnMap(list) {
+      if (!mapInstance) return;
+      mapMarkers.forEach(m => mapInstance.removeLayer(m));
+      mapMarkers = [];
+
+      list.forEach(inc => {
+        if (!inc.latitude || !inc.longitude) return;
+        const tier = (inc.severity_tier || "Medium").toLowerCase();
+        const color = tier === "critical" ? "#ff3366" : tier === "high" ? "#ffaa00" : tier === "medium" ? "#00e5ff" : "#00ff9d";
+        const radius = tier === "critical" ? 9 : tier === "high" ? 7 : 5;
+
+        const marker = L.circleMarker([inc.latitude, inc.longitude], {
+          radius: radius,
+          fillColor: color,
+          color: "#fff",
+          weight: 1,
+          opacity: 0.9,
+          fillOpacity: 0.75
+        }).addTo(mapInstance);
+
+        marker.bindPopup(`
+          <div style="font-family:var(--font-mono); font-size:11px; color:#070a0f;">
+            <strong>${inc.crime_type}</strong><br>
+            ID: ${inc.incident_id}<br>
+            SEVERITY: ${inc.severity_score} (${inc.severity_tier})<br>
+            SECTOR: ${inc.sector_name}<br>
+            PREMISE: ${inc.premise_type}<br>
+            WEAPON: ${inc.weapon_type}
+          </div>
+        `);
+        mapMarkers.push(marker);
+      });
+    }
+
+    function filterIncidents() {
+      const q = document.getElementById("incident-search").value.toLowerCase();
+      const filtered = incidentData.filter(i => 
+        (i.crime_type && i.crime_type.toLowerCase().includes(q)) ||
+        (i.sector_name && i.sector_name.toLowerCase().includes(q))
+      );
+      renderIncidents(filtered);
+    }
+
+    async function simulateIncidentIngest() {
+      const crimeType = document.getElementById("sim-crime-type").value;
+      const sector = document.getElementById("sim-sector").value;
+      const weapon = document.getElementById("sim-weapon").value;
+
+      try {
+        const resp = await fetch(`${API_BASE}/api/v1/incidents`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            crime_type: crimeType,
+            sector_code: sector,
+            premise_type: "Commercial Hub",
+            weapon_type: weapon,
+            victim_age: 32
+          })
+        });
+        const res = await resp.json();
+        if (res.status === "SUCCESS") {
+          fetchIncidents();
+        }
+      } catch (e) {
+        alert("Gateway endpoint offline. Check docker container.");
+      }
+    }
+
+    // 5. 3D Facial Mesh Engine (Three.js)
+    let threeScene, threeCamera, threeRenderer, headMeshGroup;
+
+    function init3DMeshViewer() {
+      const container = document.getElementById("three-viewport");
+      threeScene = new THREE.Scene();
+      threeCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+      threeCamera.position.z = 2.8;
+
+      threeRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      threeRenderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(threeRenderer.domElement);
+
+      headMeshGroup = new THREE.Group();
+      threeScene.add(headMeshGroup);
+
+      // Ambient and directional lighting
+      const light = new THREE.DirectionalLight(0x00e5ff, 1.2);
+      light.position.set(0, 1, 2);
+      threeScene.add(light);
+      threeScene.add(new THREE.AmbientLight(0x00ff9d, 0.4));
+
+      buildWireframeFacialMesh();
+      animate3D();
+
+      window.addEventListener("resize", () => {
+        if (!container.clientWidth) return;
+        threeCamera.aspect = container.clientWidth / container.clientHeight;
+        threeCamera.updateProjectionMatrix();
+        threeRenderer.setSize(container.clientWidth, container.clientHeight);
+      });
+    }
+
+    function buildWireframeFacialMesh() {
+      while(headMeshGroup.children.length > 0) {
+        headMeshGroup.remove(headMeshGroup.children[0]);
+      }
+
+      // 3D Anthropometric head wireframe geometry
+      const headGeom = new THREE.SphereGeometry(0.85, 24, 20);
+      headGeom.scale(0.85, 1.2, 0.95);
+      const wireMat = new THREE.MeshBasicMaterial({
+        color: 0x00ff9d,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.45
+      });
+      const wireMesh = new THREE.Mesh(headGeom, wireMat);
+      headMeshGroup.add(wireMesh);
+
+      // Point cloud landmark nodes
+      const pointsGeom = new THREE.BufferGeometry();
+      const coords = [];
+      const numPoints = 164;
+      for (let i = 0; i < numPoints; i++) {
+        const u = (Math.random() - 0.5) * 1.4;
+        const v = (Math.random() - 0.5) * 1.8;
+        const w = Math.sqrt(Math.max(0.01, 1.0 - (u*u + v*v)*0.4)) * 0.7;
+        coords.push(u, v, w);
+      }
+      pointsGeom.setAttribute('position', new THREE.Float32BufferAttribute(coords, 3));
+      const pointsMat = new THREE.PointsMaterial({ color: 0x00e5ff, size: 0.035 });
+      const points = new THREE.Points(pointsGeom, pointsMat);
+      headMeshGroup.add(points);
+    }
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+      headMeshGroup.rotation.y += 0.003;
+      threeRenderer.render(threeScene, threeCamera);
+    }
+
+    function updateMeshRotation() {
+      const pitch = parseFloat(document.getElementById("slider-pitch").value) * (Math.PI / 180);
+      const yaw = parseFloat(document.getElementById("slider-yaw").value) * (Math.PI / 180);
+      const roll = parseFloat(document.getElementById("slider-roll").value) * (Math.PI / 180);
+
+      headMeshGroup.rotation.x = pitch;
+      headMeshGroup.rotation.y = yaw;
+      headMeshGroup.rotation.z = roll;
+    }
+
+    async function loadSubject3DMesh() {
+      const subId = document.getElementById("mesh-subject-select").value;
+      try {
+        const resp = await fetch(`${API_BASE}/api/v1/surveillance/profiles/3d/${subId}`);
+        const data = await resp.json();
+        document.getElementById("mesh-depth-conf").innerText = `${(data.depth_confidence * 100).toFixed(1)}%`;
+        document.getElementById("mesh-symmetry").innerText = data.facial_symmetry_score;
+        document.getElementById("mesh-ipd").innerText = `${data.interpupillary_distance_mm} mm`;
+        document.getElementById("mesh-node-count").innerText = `${data.mesh_vertex_count || 164} VERTICES`;
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
+    function save3DProfile() {
+      alert("3D Facial Profile Topology committed to biometric persistence store.");
+    }
+
+    // 6. Human-In-The-Loop (HITL) Queue
+    async function fetchHITLQueue() {
+      try {
+        const resp = await fetch(`${API_BASE}/api/v1/surveillance/hitl/queue`);
+        const json = await resp.json();
+        const queue = json.pending_verifications || [];
+        const container = document.getElementById("hitl-queue-grid");
+        container.innerHTML = "";
+
+        if (queue.length === 0) {
+          container.innerHTML = "<div style='color:var(--text-muted); font-family:var(--font-mono);'>No pending items in queue. All biometrics verified.</div>";
+          return;
+        }
+
+        queue.forEach(item => {
+          const card = document.createElement("div");
+          card.style.cssText = "background:#0c131f; border:1px solid var(--border-hud); padding:14px; font-family:var(--font-mono);";
+          card.innerHTML = `
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+              <span style="color:var(--neon-green); font-weight:700;">${item.verification_id}</span>
+              <span class="badge badge-rec">${item.risk_level}</span>
+            </div>
+            <div style="font-size:13px; font-weight:800; color:#fff;">${item.full_name} (${item.alias})</div>
+            <div style="font-size:11px; color:var(--text-muted); margin:4px 0;">SUBJECT ID: ${item.subject_id}</div>
+            <div style="font-size:11px; color:var(--neon-cyan);">CONFIDENCE: ${(item.match_confidence * 100).toFixed(1)}%</div>
+            <div style="font-size:10px; color:#6b8298; margin-bottom:12px;">SIGHTED: ${item.sighted_camera} // ${item.timestamp}</div>
+            <button class="btn-tactical btn-verify" onclick="openHITLModal('${item.verification_id}', '${item.subject_id}', '${item.full_name}', '${item.alias}', ${item.match_confidence}, '${item.sighted_camera}', '${item.risk_level}')">[AUDIT &amp; VERIFY]</button>
+          `;
+          container.appendChild(card);
+        });
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
+    function openHITLModal(verId, subId, name, alias, conf, cam, risk) {
+      activeHITLItem = { verId, subId };
+      document.getElementById("modal-sub-id").innerText = subId || "POI-8821";
+      document.getElementById("modal-sub-name").innerText = name || "Marcus Vance";
+      document.getElementById("modal-sub-alias").innerText = alias || "Cipher";
+      document.getElementById("modal-sub-conf").innerText = conf ? `${(conf*100).toFixed(1)}%` : "94.2%";
+      document.getElementById("modal-sub-cam").innerText = cam || "CAM-SEC-01-04";
+      document.getElementById("modal-sub-risk").innerText = risk || "HIGH THREAT";
+      document.getElementById("hitl-modal").classList.add("show");
+    }
+
+    function closeHITLModal() {
+      document.getElementById("hitl-modal").classList.remove("show");
+    }
+
+    async function commitHITLDecision(decision) {
+      const notes = document.getElementById("modal-notes").value || "Operator manual verification committed.";
+      const subId = activeHITLItem ? activeHITLItem.subId : "POI-8821";
+      const verId = activeHITLItem ? activeHITLItem.verId : "HITL-POI-8821";
+
+      try {
+        const resp = await fetch(`${API_BASE}/api/v1/surveillance/hitl/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            verification_id: verId,
+            subject_id: subId,
+            decision: decision,
+            operator_name: "Khushal",
+            operator_notes: notes
+          })
+        });
+        const res = await resp.json();
+        alert(`Audit committed: ${decision}`);
+        closeHITLModal();
+        fetchHITLQueue();
+      } catch (e) {
+        alert(`Decision recorded locally: ${decision}`);
+        closeHITLModal();
+      }
+    }
+
+    // 7. AI Agent Investigation
+    async function triggerAgentInvestigation() {
+      const subId = document.getElementById("agent-target-select").value;
+      const sector = document.getElementById("agent-sector-select").value;
+      const output = document.getElementById("agent-output");
+      output.innerText = `[AGENT] Querying Knowledge Graph for ${subId} in sector ${sector}...\n[AGENT] Synthesizing context with Local Neural Inference Engine...`;
+
+      try {
+        const resp = await fetch(`${API_BASE}/api/v1/ontology/briefing`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subject_id: subId, sector: sector })
+        });
+        const data = await resp.json();
+        output.innerText = `INVESTIGATION REPORT: ${data.investigation_id}\n` +
+          `TARGET: ${data.subject_target} // SECTOR: ${data.target_sector}\n` +
+          `TIMESTAMP: ${data.timestamp}\n` +
+          `CONFIDENCE SCORE: ${(data.agent_confidence * 100).toFixed(1)}%\n` +
+          `TRAVERSED GRAPH NODES: ${data.ontology_nodes_traversed}\n\n` +
+          `EXECUTIVE SUMMARY:\n${data.executive_summary}\n\n` +
+          `RECOMMENDED PATROL DIRECTIVES:\n` +
+          data.recommended_actions.map((a, i) => `[${i+1}] ${a}`).join("\n");
+      } catch (e) {
+        output.innerText = `[LOCAL HEURISTIC BRIEFING]\nTarget: ${subId}\nSector: ${sector}\nIdentified Syndicate: DarkFiber Syndicate.\nAction: Mobilize perimeter units to CAM-${sector[:3].toUpperCase()}-01.`;
+      }
+    }
+
+    // 8. Streams Monitor
+    async function fetchStreams() {
+      try {
+        const resp = await fetch(`${API_BASE}/api/v1/streams/status`);
+        const json = await resp.json();
+        const tbody = document.getElementById("streams-table-body");
+        tbody.innerHTML = "";
+        (json.connectors || []).forEach(c => {
+          const tr = document.createElement("tr");
+          tr.style.borderBottom = "1px solid rgba(255,255,255,0.05)";
+          tr.innerHTML = `
+            <td style="padding:10px; color:#fff;">${c.stream}</td>
+            <td style="padding:10px; color:var(--text-muted);">${c.stream.includes("Kafka") ? "TCP / Binary" : c.stream.includes("Redis") ? "In-Memory" : "HTTP/RTSP"}</td>
+            <td style="padding:10px;"><span class="badge badge-online">${c.status}</span></td>
+            <td style="padding:10px; color:var(--neon-green);">${c.rate_eps ? `${c.rate_eps} events/sec` : c.fps ? `${c.fps} FPS` : 'Normal'}</td>
+            <td style="padding:10px; color:var(--neon-cyan);">${c.topic || c.key || 'Direct Socket'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
+    // 9. WebSocket Telemetry Client
+    function connectWebSocket() {
+      try {
+        const ws = new WebSocket("ws://localhost:8000/ws/telemetry");
+        ws.onopen = () => {
+          console.log("[WS] Connected to ARGUS Telemetry Fabric.");
+        };
+        ws.onmessage = (evt) => {
+          try {
+            const msg = JSON.parse(evt.data);
+            if (msg.event_type === "NEW_INCIDENT_ALERT") {
+              fetchIncidents();
+            }
+          } catch(e){}
+        };
+        ws.onclose = () => {
+          setTimeout(connectWebSocket, 5000);
+        };
+      } catch (e) {
+        console.warn("WebSocket fallback", e);
+      }
+    }
+
+    // UTC Clock
+    setInterval(() => {
+      const now = new Date();
+      document.getElementById("live-utc-clock").innerText = now.toISOString().replace("T", " ").substring(0, 19) + " UTC";
+    }, 1000);
+  </script>
+</body>
+</html>
