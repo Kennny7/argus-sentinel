@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+  # In-Memory Stream Buffer
+  redis:
+    image: redis:7.2-alpine
+    container_name: argus-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Free & Open Source Kafka-Compatible Broker (Redpanda)
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.3.11
+    container_name: argus-redpanda
+    command:
+      - redpanda start
+      - --smp 1
+      - --memory 512M
+      - --overprovisioned
+      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
+    ports:
+      - "9092:9092"
+    restart: unless-stopped
+
+  # API Gateway & WebSocket Router
+  gateway-api:
+    build:
+      context: ./services/gateway-api
+      dockerfile: Dockerfile
+    container_name: argus-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - GATEWAY_PORT=8000
+      - GATEWAY_HOST=0.0.0.0
+      - PREDICTION_SERVICE_URL=http://crime-prediction:8001
+      - SURVEILLANCE_SERVICE_URL=http://surveillance-recon:8002
+      - INGESTION_SERVICE_URL=http://stream-ingestion:8003
+      - ONTOLOGY_SERVICE_URL=http://ontology-agent:8004
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - crime-prediction
+      - surveillance-recon
+      - ontology-agent
+    restart: unless-stopped
+
+  # Machine Learning Severity & Hotspot Prediction
+  crime-prediction:
+    build:
+      context: ./services/crime-prediction-service
+      dockerfile: Dockerfile
+    container_name: argus-prediction
+    ports:
+      - "8001:8001"
+    environment:
+      - PREDICTION_PORT=8001
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  # CCTV Target Tracking, Biometric Matching & 3D Mesh
+  surveillance-recon:
+    build:
+      context: ./services/surveillance-recon-service
+      dockerfile: Dockerfile
+    container_name: argus-surveillance
+    ports:
+      - "8002:8002"
+    environment:
+      - SURVEILLANCE_PORT=8002
+    volumes:
+      - ./data:/app/data
+      - ./assets:/app/assets
+    restart: unless-stopped
+
+  # Multi-Protocol Stream Ingestion Gateway
+  stream-ingestion:
+    build:
+      context: ./services/stream-ingestion-service
+      dockerfile: Dockerfile
+    container_name: argus-ingestion
+    ports:
+      - "8003:8003"
+    environment:
+      - INGESTION_PORT=8003
+      - KAFKA_BOOTSTRAP_SERVERS=redpanda:29092
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redpanda
+      - redis
+    restart: unless-stopped
+
+  # Knowledge Graph & Autonomous Agent
+  ontology-agent:
+    build:
+      context: ./services/ontology-agent-service
+      dockerfile: Dockerfile
+    container_name: argus-ontology
+    ports:
+      - "8004:8004"
+    environment:
+      - ONTOLOGY_PORT=8004
+      - LLM_BASE_URL=http://10.210.8.63:8080/v1
+      - LLM_MODEL=google/gemma-4-E4B-it-qat-q4_0-gguf:Q4_0
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  # Tactical Dashboard Web UI
+  tactical-dashboard:
+    build:
+      context: ./services/tactical-dashboard
+      dockerfile: Dockerfile
+    container_name: argus-dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - DASHBOARD_PORT=3000
+    volumes:
+      - ./assets:/app/assets
+    depends_on:
+      - gateway-api
+    restart: unless-stopped
