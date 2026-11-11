@@ -1,0 +1,114 @@
+{
+  "ontology_name": "ARGUS Urban Crime & Threat Ontology",
+  "version": "2.4.0",
+  "classes": [
+    "PersonOfInterest",
+    "CrimeIncident",
+    "SurveillanceSensor",
+    "WeaponSystem",
+    "UrbanSector",
+    "SyndicateNetwork",
+    "TacticalResponseUnit"
+  ],
+  "relationships": [
+    {
+      "subject": "PersonOfInterest",
+      "predicate": "INVOLVED_IN",
+      "object": "CrimeIncident"
+    },
+    {
+      "subject": "CrimeIncident",
+      "predicate": "LOCATED_IN",
+      "object": "UrbanSector"
+    },
+    {
+      "subject": "SurveillanceSensor",
+      "predicate": "MONITORS_SECTOR",
+      "object": "UrbanSector"
+    },
+    {
+      "subject": "SurveillanceSensor",
+      "predicate": "CAPTURED_TARGET",
+      "object": "PersonOfInterest"
+    },
+    {
+      "subject": "PersonOfInterest",
+      "predicate": "AFFILIATED_WITH",
+      "object": "SyndicateNetwork"
+    },
+    {
+      "subject": "CrimeIncident",
+      "predicate": "UTILIZED_WEAPON",
+      "object": "WeaponSystem"
+    },
+    {
+      "subject": "TacticalResponseUnit",
+      "predicate": "DISPATCHED_TO",
+      "object": "CrimeIncident"
+    }
+  ],
+  "knowledge_triples": [
+    {
+      "subject": "POI-8821",
+      "predicate": "INVOLVED_IN",
+      "object": "INC-2026-0012"
+    },
+    {
+      "subject": "POI-8821",
+      "predicate": "AFFILIATED_WITH",
+      "object": "DarkFiber Syndicate"
+    },
+    {
+      "subject": "CAM-SEC-01-04",
+      "predicate": "CAPTURED_TARGET",
+      "object": "POI-8821"
+    },
+    {
+      "subject": "INC-2026-0012",
+      "predicate": "LOCATED_IN",
+      "object": "SEC-01"
+    },
+    {
+      "subject": "POI-9043",
+      "predicate": "INVOLVED_IN",
+      "object": "INC-2026-0045"
+    },
+    {
+      "subject": "POI-9043",
+      "predicate": "AFFILIATED_WITH",
+      "object": "BlackWave Logistics"
+    },
+    {
+      "subject": "CAM-SEC-02-01",
+      "predicate": "CAPTURED_TARGET",
+      "object": "POI-9043"
+    },
+    {
+      "subject": "POI-3312",
+      "predicate": "AFFILIATED_WITH",
+      "object": "BlackWave Logistics"
+    },
+    {
+      "subject": "UNIT-108",
+      "predicate": "DISPATCHED_TO",
+      "object": "INC-2026-0012"
+    }
+  ],
+  "syndicates": [
+    {
+      "name": "DarkFiber Syndicate",
+      "threat_tier": "Critical",
+      "focus": "Critical Cyber & Grid Infiltration"
+    },
+    {
+      "name": "BlackWave Logistics",
+      "threat_tier": "Critical",
+      "focus": "Contraband & Illegal Munitions"
+    },
+    {
+      "name": "Apex Ledger Syndicate",
+      "threat_tier": "High",
+      "focus": "Autonomous Financial Wire Fraud"
+    }
+  ]
+}
